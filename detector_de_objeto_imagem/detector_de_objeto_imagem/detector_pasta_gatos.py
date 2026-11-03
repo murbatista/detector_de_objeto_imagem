@@ -1,66 +1,159 @@
+
 import os
 import cv2
 from ultralytics import YOLO
 
-print("Carregando o modelo YOLOv8...")
-model = YOLO("yolov8n.pt")
 
-pasta_origem = "cat_images"
-pasta_destino = "resultados_gatos"
+# -------------------------------------------------------------
+# 1. CARREGAMENTO DO MODELO DE INTELIGÊNCIA ARTIFICIAL
+# -------------------------------------------------------------
 
-os.makedirs(pasta_destino, exist_ok=True)
+print("Inicializando o detector de imagens...")
 
-extensoes_validas = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
+detector = YOLO("yolov8n.pt")
 
-if not os.path.exists(pasta_origem):
-    print(f"❌ Erro: A pasta '{pasta_origem}' não foi encontrada!")
-    print(f"Por favor, crie a pasta '{pasta_origem}' e coloque as imagens dentro dela.")
+
+# -------------------------------------------------------------
+# 2. CONFIGURAÇÃO DAS PASTAS
+# -------------------------------------------------------------
+
+diretorio_entrada = "cat_images"
+diretorio_saida = "resultados_gatos"
+
+os.makedirs(diretorio_saida, exist_ok=True)
+
+formatos_permitidos = (
+    ".jpg", ".jpeg", ".png", ".bmp", ".webp"
+)
+
+
+# -------------------------------------------------------------
+# 3. VERIFICAÇÃO DOS ARQUIVOS
+# -------------------------------------------------------------
+
+if not os.path.isdir(diretorio_entrada):
+
+    print(f"Erro: Diretório '{diretorio_entrada}' não encontrado!")
+    print("Crie a pasta e adicione as imagens para continuar.")
+
     exit()
 
-arquivos = [f for f in os.listdir(pasta_origem) 
-if f.lower().endswith(extensoes_validas)]
 
-if not arquivos:
-        print(f"⚠️ Nenhuma imagem válida encontrada na pasta '{pasta_origem}'.")
-        exit()
+lista_imagens = [
+    arquivo
+    for arquivo in os.listdir(diretorio_entrada)
+    if arquivo.lower().endswith(formatos_permitidos)
+]
 
-print(f"📸 Encontradas {len(arquivos)} imagens para processar em '{pasta_origem}'...\n")
 
-ID_GATO = 15  # ID numérico da classe 'cat' no dataset COCO
-total_gatos_detectados = 0
+if len(lista_imagens) == 0:
 
-for i, nome_arquivo in enumerate(arquivos, start=1):
-    caminho_imagem = os.path.join(pasta_origem, nome_arquivo)
-    print(f"[{i}/{len(arquivos)}] Analisando: {nome_arquivo}...")
-    # Executa a inferência de Visão Computacional
-    resultados = model(caminho_imagem, verbose=False)
-    resultado = resultados[0]
+    print("Nenhuma imagem compatível foi localizada.")
 
-    gatos_na_foto = 0
+    exit()
 
-	# Analisa as caixas delimitadoras encontradas
-    for box in resultado.boxes:
-        classe_id = int(box.cls[0])
-        confianca = float(box.conf[0])
-	
-        if classe_id == ID_GATO:
-            gatos_na_foto += 1
-            total_gatos_detectados += 1
-            print(f"  🐱 Gato detectado! Confiança: {confianca * 100:.1f}%")
-	
-if gatos_na_foto == 0:
-	print("  ⚠️ Nenhum gato detectado nesta foto.")
-	
-	# Desenha as marcações na imagem
-imagem_desenhada = resultado.plot()
-	
-	# Salva a imagem processada na pasta de destino
-caminho_saida = os.path.join(pasta_destino, f"resultado_{nome_arquivo}")
-cv2.imwrite(caminho_saida, imagem_desenhada)
-print(f"  ✅ Salvo em: {caminho_saida}\n")
-	
+
+print(
+    f"\nTotal de imagens encontradas: {len(lista_imagens)}"
+)
+
+
+# -------------------------------------------------------------
+# 4. CONFIGURAÇÃO DA DETECÇÃO
+# -------------------------------------------------------------
+
+CLASSE_GATO = 15
+
+quantidade_gatos = 0
+
+
+# -------------------------------------------------------------
+# 5. ANÁLISE E IDENTIFICAÇÃO DOS GATOS
+# -------------------------------------------------------------
+
+for posicao, arquivo in enumerate(lista_imagens, start=1):
+
+    caminho_atual = os.path.join(
+        diretorio_entrada, arquivo
+    )
+
+    print(
+        f"\n[{posicao}/{len(lista_imagens)}] "
+        f"Verificando imagem: {arquivo}"
+    )
+
+    # Executa a detecção utilizando YOLO
+    previsoes = detector(
+        caminho_atual,
+        verbose=False
+    )
+
+    deteccao = previsoes[0]
+
+    gatos_encontrados = 0
+
+    # Verifica os objetos identificados pelo modelo
+    for objeto in deteccao.boxes:
+
+        identificador = int(objeto.cls[0])
+        nivel_confianca = float(objeto.conf[0])
+
+        if identificador == CLASSE_GATO:
+
+            gatos_encontrados += 1
+            quantidade_gatos += 1
+
+            print(
+                f"  Gato identificado! "
+                f"Precisão estimada: {nivel_confianca * 100:.1f}%"
+            )
+
+    # Informa quando nenhum gato é encontrado
+    if gatos_encontrados == 0:
+
+        print("  Nenhum gato foi identificado nesta imagem.")
+
+    else:
+
+        print(
+            f"  Quantidade de gatos nesta imagem: "
+            f"{gatos_encontrados}"
+        )
+
+    # Cria uma versão da imagem com as marcações
+    imagem_resultado = deteccao.plot()
+
+    # Define o caminho para salvar o resultado
+    nome_saida = f"resultado_{arquivo}"
+
+    destino_imagem = os.path.join(
+        diretorio_saida, nome_saida
+    )
+
+    # Exporta a imagem processada
+    sucesso = cv2.imwrite(
+        destino_imagem,
+        imagem_resultado
+    )
+
+    if sucesso:
+        print(f"  Imagem salva: {destino_imagem}")
+    else:
+        print("  Não foi possível salvar esta imagem.")
+
+
+# -------------------------------------------------------------
+# 6. RELATÓRIO FINAL DO PROCESSAMENTO
+# -------------------------------------------------------------
+
+print("\n" + "=" * 50)
+
+print("PROCESSAMENTO FINALIZADO!")
+
+print(f"Imagens analisadas: {len(lista_imagens)}")
+
+print(f"Gatos identificados: {quantidade_gatos}")
+
+print(f"Resultados armazenados em: '{diretorio_saida}'")
+
 print("=" * 50)
-print(f"🎉 Processamento concluído!")
-print(f"📊 Total de fotos analisadas: {len(arquivos)}")
-print(f"🐱 Total de gatos identificados: {total_gatos_detectados}")
-print(f"📁 Imagens marcadas salvas na pasta: '{pasta_destino}'")
